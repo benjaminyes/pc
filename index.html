@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PrivateMail</title>
+<style>
+body { font-family: system-ui; background:#0b0f14; color:#fff; }
+#box { max-width:800px; margin:auto; }
+input,button { padding:8px; margin:4px; }
+.thread { border:1px solid #444; padding:6px; margin:6px; }
+.msg { background:#1c2430; padding:4px; margin:3px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="box">
+
+<h2>PrivateMail Chat</h2>
+
+<div id="login">
+  Username: <input id="name">
+  <button onclick="register()">Enter</button>
+</div>
+
+<div id="app" style="display:none">
+
+<input id="search" placeholder="Search users">
+<button onclick="search()">Search</button>
+
+<div id="results"></div>
+
+<hr>
+
+<div id="threads"></div>
+
+<input id="msg" placeholder="Message">
+<button onclick="send()">Send</button>
+
+</div>
+
+<script>
+const WS = new WebSocket("wss://morning-queen-9aca.benjamin-orian.workers.dev/");
+
+let user = null;
+let currentThread = null;
+
+WS.onmessage = e => {
+  const msg = JSON.parse(e.data);
+
+  if (msg.type === "registered") {
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").style.display="block";
+  }
+
+  if (msg.type === "search_results") {
+    const d = document.getElementById("results");
+    d.innerHTML="";
+    msg.results.forEach(u=>{
+      const b=document.createElement("button");
+      b.textContent=u.name + (u.online?" 🟢":"");
+      b.onclick=()=>createThread(u.name);
+      d.appendChild(b);
+    });
+  }
+
+  if (msg.type === "thread_created") {
+    currentThread = msg.id;
+    document.getElementById("threads").innerHTML += 
+      `<div class="thread" id="${msg.id}">Thread ${msg.id}</div>`;
+  }
+
+  if (msg.type === "inbox") {
+    const div = document.getElementById(msg.thread);
+    const m = document.createElement("div");
+    m.className="msg";
+    m.textContent = msg.message.from + ": " + msg.message.data;
+    div.appendChild(m);
+  }
+};
+
+function register() {
+  user = name.value;
+  WS.send(JSON.stringify({type:"register", name: user}));
+}
+
+function search() {
+  WS.send(JSON.stringify({type:"search_users", query: search.value}));
+}
+
+function createThread(u) {
+  WS.send(JSON.stringify({type:"create_thread", recipients: [user, u]}));
+}
+
+function send() {
+  WS.send(JSON.stringify({
+    type:"thread_message",
+    thread: currentThread,
+    from: user,
+    data: msg.value
+  }));
+  msg.value="";
+}
+</script>
+
+</div>
+</body>
+</html>
