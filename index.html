@@ -91,7 +91,8 @@ function run(s){
  let c=p.shift();
 
  if(c==="login"){
-   user=p[0];
+   if(!p[0]) return print("username required","sys");
+   user = p[0];
    WS.send(JSON.stringify({type:"register", name:user}));
  }
 
@@ -99,9 +100,22 @@ function run(s){
    WS.send(JSON.stringify({type:"search_users", query:p[0]}));
  }
 
+ if(c==="open"){
+   if(!p[0]) return print("username required","sys");
+   WS.send(JSON.stringify({
+     type:"create_thread",
+     recipients:[user, p[0]]
+   }));
+ }
+
  if(c==="msg"){
    if(!thread) return print("no thread open","sys");
-   WS.send(JSON.stringify({type:"thread_message",thread,from:user,data:p.join(" ")}));
+   WS.send(JSON.stringify({
+     type:"thread_message",
+     thread,
+     from:user,
+     data:p.join(" ")
+   }));
  }
 }
 </script>
