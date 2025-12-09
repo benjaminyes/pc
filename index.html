@@ -61,7 +61,7 @@ const print = (txt,cls="")=>{
 };
 
 print("PrivateMail v1.0");
-print("commands: login <name>, search <user>, msg <text>", "sys");
+print("commands: login <name>, search <user>, open <user>, msg <text>", "sys");
 
 WS.onmessage = e=>{
  const m = JSON.parse(e.data);
