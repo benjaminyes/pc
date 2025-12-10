@@ -1,166 +1,200 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>PrivateMail</title>
 <style>
+* { box-sizing: border-box; }
+
 body {
-  font-family: system-ui, sans-serif;
   margin: 0;
-  background: #f4f4f4;
   display: flex;
   height: 100vh;
+  background: #1e1f22;
+  color: #dcddde;
+  font-family: system-ui;
 }
 
-/* LEFT PANEL */
-#sidebar {
-  width: 260px;
-  background: white;
-  border-right: 1px solid #ccc;
-  padding: 10px;
-  overflow-y: auto;
+/* SERVER BAR */
+#servers {
+  width: 70px;
+  background: #111214;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-#sidebar h3 {
-  margin: 0 0 10px;
-}
-#users div, #threads div {
-  padding: 6px;
+.server {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #5865f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  border-radius: 5px;
 }
-#users div:hover,
-#threads div:hover {
-  background: #ddd;
+.server:hover { border-radius: 35%; }
+
+/* CHANNEL LIST */
+#channels {
+  width: 240px;
+  background: #2b2d31;
+  padding: 10px;
 }
 
-/* MAIN */
+/* MAIN CHAT */
 #main {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* TOP BAR */
-#top {
-  background: white;
+/* HEADER */
+#header {
+  background: #313338;
   padding: 10px;
-  border-bottom: 1px solid #ccc;
-  display: flex;
-  gap: 5px;
-}
-#top input {
-  flex: 1;
-  padding: 6px;
 }
 
-/* CHAT */
+/* MESSAGES */
 #chat {
   flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+.msg {
+  margin-bottom: 6px;
+}
+.user { color: #4fd58f; }
+
+/* INPUT */
+#inputBar {
+  background: #383a40;
+  padding: 10px;
+}
+#input {
+  width: 100%;
+  background: #404249;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* USERS */
+#users {
+  width: 200px;
+  background: #2b2d31;
   padding: 10px;
   overflow-y: auto;
 }
 
-.msg {
-  margin-bottom: 6px;
+/* LOGIN */
+#login {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.user {
-  font-weight: bold;
-}
-
-/* INPUT */
-#input {
-  border: none;
-  border-top: 1px solid #ccc;
-  padding: 10px;
-  font-size: 14px;
-  outline: none;
+#loginBox {
+  background: #2b2d31;
+  padding: 20px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="sidebar">
-  <h3>Users</h3>
-  <input placeholder="search..." id="search" />
-  <div id="users"></div>
-  <hr>
-  <h3>Threads</h3>
+<div id="login">
+  <div id="loginBox">
+    <input id="username" placeholder="Username">
+    <button onclick="login()">Enter</button>
+  </div>
+</div>
+
+<div id="servers">
+  <div class="server" onclick="openGlobal()">🌍</div>
+</div>
+
+<div id="channels">
+  <h3>Direct Messages</h3>
   <div id="threads"></div>
 </div>
 
 <div id="main">
-  <div id="top">
-    <input id="username" placeholder="username">
-    <button onclick="login()">Login</button>
-  </div>
+  <div id="header"></div>
   <div id="chat"></div>
-  <input id="input" placeholder="type message...">
+  <div id="inputBar">
+    <input id="input" placeholder="Message...">
+  </div>
 </div>
 
+<div id="users"></div>
+
 <script>
-const WS = new WebSocket("wss://YOUR_WORKER_URL");
+const WS = new WebSocket("wss://morning-queen-9aca.benjamin-orian.workers.dev");
 
+const GLOBAL = "global";
 let username = null;
-let curThread = null;
-let threads = {};
+let currentThread = GLOBAL;
+let threads = {[GLOBAL]: []};
 
+const chat = document.getElementById("chat");
+const header = document.getElementById("header");
+const threadList = document.getElementById("threads");
 const usersDiv = document.getElementById("users");
-const threadsDiv = document.getElementById("threads");
-const chatDiv = document.getElementById("chat");
+const loginBox = document.getElementById("login");
 
+// RECEIVE EVENTS
 WS.onmessage = e => {
   const msg = JSON.parse(e.data);
 
-  if (msg.type === "search_results") {
-    usersDiv.innerHTML = "";
-    msg.results.forEach(u => {
-      const d = document.createElement("div");
-      d.textContent = u.name + (u.online ? " (online)" : "");
-      d.onclick = () => openThread(u.name);
-      usersDiv.appendChild(d);
-    });
-  }
-
   if (msg.type === "thread_created") {
-    curThread = msg.id;
-    threads[curThread] = [];
+    threads[msg.id] ??= [];
     renderThreads();
   }
 
   if (msg.type === "new_message") {
     threads[msg.thread] ??= [];
     threads[msg.thread].push(msg.message);
-    if (msg.thread === curThread) renderChat();
+    if (msg.thread === currentThread) renderChat();
+  }
+
+  if (msg.type === "search_results") {
+    usersDiv.innerHTML = "<b>Online Users</b>";
+    msg.results.forEach(u => {
+      const d = document.createElement("div");
+      d.textContent = u.name + (u.online ? " ●" : "");
+      d.onclick = () => openDM(u.name);
+      usersDiv.appendChild(d);
+    });
   }
 };
 
 function login() {
   username = document.getElementById("username").value;
   WS.send(JSON.stringify({ type: "register", name: username }));
+  loginBox.style.display = "none";
+  WS.send(JSON.stringify({ type: "search_users", query: "" }));
+  openGlobal();
 }
 
-document.getElementById("search").oninput = e => {
-  WS.send(JSON.stringify({
-    type: "search_users",
-    query: e.target.value
-  }));
-};
+function openGlobal() {
+  currentThread = GLOBAL; renderChat();
+}
 
-function openThread(user) {
-  WS.send(JSON.stringify({
-    type: "create_thread",
-    recipients: [username, user]
-  }));
+function openDM(user) {
+  WS.send(JSON.stringify({ type: "create_thread", recipients: [username, user] }));
 }
 
 document.getElementById("input").onkeydown = e => {
   if (e.key !== "Enter") return;
-  if (!curThread) return alert("Select a thread first");
 
   WS.send(JSON.stringify({
     type: "thread_message",
-    thread: curThread,
+    thread: currentThread,
     from: username,
     data: e.target.value
   }));
@@ -169,28 +203,31 @@ document.getElementById("input").onkeydown = e => {
 };
 
 function renderThreads() {
-  threadsDiv.innerHTML = "";
+  threadList.innerHTML = "";
   for (const id in threads) {
+    if (id === GLOBAL) continue;
     const d = document.createElement("div");
-    d.textContent = "Thread " + id.slice(0,6);
-    d.onclick = () => {
-      curThread = id;
-      renderChat();
-    };
-    threadsDiv.appendChild(d);
+    d.textContent = "DM " + id.slice(0,6);
+    d.onclick = () => {currentThread = id; renderChat()};
+    threadList.appendChild(d);
   }
 }
 
 function renderChat() {
-  chatDiv.innerHTML = "";
-  const msgs = threads[curThread] || [];
-  msgs.forEach(m => {
+  header.textContent = currentThread === GLOBAL ? "🌍 Global Chat" : "DM Thread";
+  chat.innerHTML = "";
+  (threads[currentThread] || []).forEach(m => {
     const d = document.createElement("div");
     d.className = "msg";
-    d.innerHTML = `<span class="user">${m.from}</span>: ${m.data}`;
-    chatDiv.appendChild(d);
+    d.innerHTML = `<span class="user">${m.from}</span> ${m.data}`;
+    chat.appendChild(d);
   });
 }
+
+// AUTO SEARCH USERS
+setInterval(() => {
+  WS.send(JSON.stringify({ type: "search_users", query: "" }));
+}, 4000);
 </script>
 
 </body>
